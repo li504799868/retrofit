@@ -25,7 +25,13 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
 
+/**
+ * 平台封装类
+ * */
 class Platform {
+  /**
+   * 找到使用的平台
+   * */
   private static final Platform PLATFORM = findPlatform();
 
   static Platform get() {
@@ -33,6 +39,7 @@ class Platform {
   }
 
   private static Platform findPlatform() {
+    // 安卓
     try {
       Class.forName("android.os.Build");
       if (Build.VERSION.SDK_INT != 0) {
@@ -40,11 +47,13 @@ class Platform {
       }
     } catch (ClassNotFoundException ignored) {
     }
+    // java
     try {
       Class.forName("java.util.Optional");
       return new Java8();
     } catch (ClassNotFoundException ignored) {
     }
+    // 默认
     return new Platform();
   }
 
@@ -87,6 +96,9 @@ class Platform {
     }
   }
 
+  /**
+   * 安卓平台
+   * */
   static class Android extends Platform {
     @Override public Executor defaultCallbackExecutor() {
       return new MainThreadExecutor();

@@ -61,9 +61,12 @@ public final class Retrofit {
   private final Map<Method, ServiceMethod<?, ?>> serviceMethodCache = new ConcurrentHashMap<>();
 
   final okhttp3.Call.Factory callFactory;
+  // 网络请求的前缀域名
   final HttpUrl baseUrl;
+  // 转换工厂，可以对请求的数据和返回的数据进行加工
   final List<Converter.Factory> converterFactories;
   final List<CallAdapter.Factory> callAdapterFactories;
+  // 线程池
   final @Nullable Executor callbackExecutor;
   final boolean validateEagerly;
 
@@ -126,10 +129,12 @@ public final class Retrofit {
    */
   @SuppressWarnings("unchecked") // Single-interface proxy creation guarded by parameter safety.
   public <T> T create(final Class<T> service) {
+    // 检查创建的网络请求的服务接口是否可用
     Utils.validateServiceInterface(service);
     if (validateEagerly) {
       eagerlyValidateMethods(service);
     }
+    // 当调用定义的接口方法的时候，通过动态代理调用自己的逻辑，发起网络请求
     return (T) Proxy.newProxyInstance(service.getClassLoader(), new Class<?>[] { service },
         new InvocationHandler() {
           private final Platform platform = Platform.get();
@@ -137,36 +142,51 @@ public final class Retrofit {
           @Override public Object invoke(Object proxy, Method method, @Nullable Object[] args)
               throws Throwable {
             // If the method is a method from Object then defer to normal invocation.
+            // 如果参数的类型是Object，直接反射调用
             if (method.getDeclaringClass() == Object.class) {
               return method.invoke(this, args);
             }
+            // 如果是default方法，根据平台类型直接调用
+            // android平台固定返回false
             if (platform.isDefaultMethod(method)) {
               return platform.invokeDefaultMethod(method, service, proxy, args);
             }
+            // 通过Method，封装成okhttp请求
             ServiceMethod<Object, Object> serviceMethod =
                 (ServiceMethod<Object, Object>) loadServiceMethod(method);
             OkHttpCall<Object> okHttpCall = new OkHttpCall<>(serviceMethod, args);
+            // 发起网络请求
             return serviceMethod.adapt(okHttpCall);
           }
         });
   }
 
+  /**
+   * 通过反射加载所有定义的方法
+   * */
   private void eagerlyValidateMethods(Class<?> service) {
+    // 得到当前的平台，android或者Java
     Platform platform = Platform.get();
+    // 遍历接口类中声明的方法
     for (Method method : service.getDeclaredMethods()) {
+      // 一个default方法的特征：public，非抽象方法的实例中的方法，非static，在接口中声明
+      // android平台默认返回的全是false，所以都需要添加
       if (!platform.isDefaultMethod(method)) {
+        // 加载方法
         loadServiceMethod(method);
       }
     }
   }
 
   ServiceMethod<?, ?> loadServiceMethod(Method method) {
+    // 如果缓存中已经有了这个方法，直接返回
     ServiceMethod<?, ?> result = serviceMethodCache.get(method);
     if (result != null) return result;
-
+    // 同步锁
     synchronized (serviceMethodCache) {
       result = serviceMethodCache.get(method);
       if (result == null) {
+        // 把这个方法封装成ServiceMethod对象，保存起来
         result = new ServiceMethod.Builder<>(this, method).build();
         serviceMethodCache.put(method, result);
       }
@@ -587,6 +607,7 @@ public final class Retrofit {
 
       // Make a defensive copy of the adapters and add the default Call adapter.
       List<CallAdapter.Factory> callAdapterFactories = new ArrayList<>(this.callAdapterFactories);
+      // 默认添加了平台的callAdapter
       callAdapterFactories.add(platform.defaultCallAdapterFactory(callbackExecutor));
 
       // Make a defensive copy of the converters.

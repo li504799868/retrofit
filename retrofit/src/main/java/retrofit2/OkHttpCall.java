@@ -29,17 +29,33 @@ import okio.Okio;
 import static retrofit2.Utils.checkNotNull;
 import static retrofit2.Utils.throwIfFatal;
 
+/**
+ * 封装的Call信息
+ * */
 final class OkHttpCall<T> implements Call<T> {
+  /**
+   * 生成的ServiceMethod
+   * */
   private final ServiceMethod<T, ?> serviceMethod;
+
+  /**
+   * 参数集合
+   * */
   private final @Nullable Object[] args;
 
   private volatile boolean canceled;
 
   @GuardedBy("this")
+  /**
+   * okhttp的Call对象
+   * */
   private @Nullable okhttp3.Call rawCall;
   @GuardedBy("this") // Either a RuntimeException, non-fatal Error, or IOException.
   private @Nullable Throwable creationFailure;
   @GuardedBy("this")
+  /**
+   * 是否正在执行
+   * */
   private boolean executed;
 
   OkHttpCall(ServiceMethod<T, ?> serviceMethod, @Nullable Object[] args) {
@@ -53,10 +69,12 @@ final class OkHttpCall<T> implements Call<T> {
   }
 
   @Override public synchronized Request request() {
+    // 如果已经有okhttp的call请求，返回call的request
     okhttp3.Call call = rawCall;
     if (call != null) {
       return call.request();
     }
+    // 判断是否创建请求失败过
     if (creationFailure != null) {
       if (creationFailure instanceof IOException) {
         throw new RuntimeException("Unable to create request.", creationFailure);
@@ -67,6 +85,7 @@ final class OkHttpCall<T> implements Call<T> {
       }
     }
     try {
+      // 创建okhttp请求
       return (rawCall = createRawCall()).request();
     } catch (RuntimeException | Error e) {
       throwIfFatal(e); // Do not assign a fatal error to creationFailure.
@@ -78,6 +97,9 @@ final class OkHttpCall<T> implements Call<T> {
     }
   }
 
+  /**
+   * 执行网络请求
+   * */
   @Override public void enqueue(final Callback<T> callback) {
     checkNotNull(callback, "callback == null");
 
@@ -181,6 +203,9 @@ final class OkHttpCall<T> implements Call<T> {
     return parseResponse(call.execute());
   }
 
+  /**
+   * 根据解析的信息，创建okhttp请求
+   * */
   private okhttp3.Call createRawCall() throws IOException {
     okhttp3.Call call = serviceMethod.toCall(args);
     if (call == null) {
@@ -189,10 +214,15 @@ final class OkHttpCall<T> implements Call<T> {
     return call;
   }
 
+  /**
+   * 解析网络请求的返回结果
+   * */
   Response<T> parseResponse(okhttp3.Response rawResponse) throws IOException {
+    // okhttp的请求结果
     ResponseBody rawBody = rawResponse.body();
 
     // Remove the body's source (the only stateful object) so we can pass the response along.
+    // 创建新的Response
     rawResponse = rawResponse.newBuilder()
         .body(new NoContentResponseBody(rawBody.contentType(), rawBody.contentLength()))
         .build();
@@ -201,7 +231,9 @@ final class OkHttpCall<T> implements Call<T> {
     if (code < 200 || code >= 300) {
       try {
         // Buffer the entire body to avoid future I/O.
+        // body读取出来
         ResponseBody bufferedBody = Utils.buffer(rawBody);
+        // 返回Response
         return Response.error(bufferedBody, rawResponse);
       } finally {
         rawBody.close();
@@ -213,8 +245,10 @@ final class OkHttpCall<T> implements Call<T> {
       return Response.success(null, rawResponse);
     }
 
+    // 对rawBody封装一层代理
     ExceptionCatchingRequestBody catchingBody = new ExceptionCatchingRequestBody(rawBody);
     try {
+      // 对返回的结果进行转换
       T body = serviceMethod.toResponse(catchingBody);
       return Response.success(body, rawResponse);
     } catch (RuntimeException e) {

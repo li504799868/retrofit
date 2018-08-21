@@ -299,24 +299,31 @@ final class Utils {
     return ResponseBody.create(body.contentType(), body.contentLength(), buffer);
   }
 
+  /**
+   * 判断定义网络请求的接口类，是否符合要求
+   * */
   static <T> void validateServiceInterface(Class<T> service) {
+    // 必须是接口
     if (!service.isInterface()) {
       throw new IllegalArgumentException("API declarations must be interfaces.");
     }
     // Prevent API interfaces from extending other interfaces. This not only avoids a bug in
     // Android (http://b.android.com/58753) but it forces composition of API declarations which is
     // the recommended pattern.
+    // 不能实现接口，也就是说一个纯接口类
     if (service.getInterfaces().length > 0) {
       throw new IllegalArgumentException("API interfaces must not extend other interfaces.");
     }
   }
 
   static Type getParameterUpperBound(int index, ParameterizedType type) {
+    // 是否有泛型集合
     Type[] types = type.getActualTypeArguments();
     if (index < 0 || index >= types.length) {
       throw new IllegalArgumentException(
           "Index " + index + " not in range [0," + types.length + ") for " + type);
     }
+    // 得到返回值的类型
     Type paramType = types[index];
     if (paramType instanceof WildcardType) {
       return ((WildcardType) paramType).getUpperBounds()[0];
@@ -324,10 +331,15 @@ final class Utils {
     return paramType;
   }
 
+  /**
+   *
+   * */
   static boolean hasUnresolvableType(@Nullable Type type) {
+    // 如果返回值是Class类，返回false
     if (type instanceof Class<?>) {
       return false;
     }
+    // 得到type的泛型集合，递归判断泛型的类型
     if (type instanceof ParameterizedType) {
       ParameterizedType parameterizedType = (ParameterizedType) type;
       for (Type typeArgument : parameterizedType.getActualTypeArguments()) {
@@ -337,12 +349,14 @@ final class Utils {
       }
       return false;
     }
+    // 是否是一个数组类型，判断数组中的元素的类型
     if (type instanceof GenericArrayType) {
       return hasUnresolvableType(((GenericArrayType) type).getGenericComponentType());
     }
     if (type instanceof TypeVariable) {
       return true;
     }
+    // 参数是否有继承关系
     if (type instanceof WildcardType) {
       return true;
     }
@@ -351,6 +365,9 @@ final class Utils {
         + "GenericArrayType, but <" + type + "> is of type " + className);
   }
 
+  /**
+   *
+   * */
   static Type getCallResponseType(Type returnType) {
     if (!(returnType instanceof ParameterizedType)) {
       throw new IllegalArgumentException(

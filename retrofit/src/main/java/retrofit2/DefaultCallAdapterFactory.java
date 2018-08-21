@@ -23,9 +23,13 @@ import java.lang.reflect.Type;
  * callbacks. For synchronous calls this is the application thread making the request; for
  * asynchronous calls this is a thread provided by OkHttp's dispatcher.
  */
+/**
+ * 默认的CallAdapterFactory
+ * */
 final class DefaultCallAdapterFactory extends CallAdapter.Factory {
   static final CallAdapter.Factory INSTANCE = new DefaultCallAdapterFactory();
 
+  // 返回对应CallAdapter
   @Override
   public CallAdapter<?, ?> get(Type returnType, Annotation[] annotations, Retrofit retrofit) {
     if (getRawType(returnType) != Call.class) {

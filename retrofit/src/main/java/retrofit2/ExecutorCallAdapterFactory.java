@@ -23,6 +23,9 @@ import okhttp3.Request;
 
 import static retrofit2.Utils.checkNotNull;
 
+/**
+ * 如果指定了线程池，会被封装成ExecutorCallAdapterFactory
+ * */
 final class ExecutorCallAdapterFactory extends CallAdapter.Factory {
   final Executor callbackExecutor;
 
@@ -30,6 +33,7 @@ final class ExecutorCallAdapterFactory extends CallAdapter.Factory {
     this.callbackExecutor = callbackExecutor;
   }
 
+  // 找到对应的CallAdapter
   @Override
   public CallAdapter<?, ?> get(Type returnType, Annotation[] annotations, Retrofit retrofit) {
     if (getRawType(returnType) != Call.class) {
@@ -56,11 +60,15 @@ final class ExecutorCallAdapterFactory extends CallAdapter.Factory {
       this.delegate = delegate;
     }
 
+    /**
+     * 执行网络请求
+     * */
     @Override public void enqueue(final Callback<T> callback) {
       checkNotNull(callback, "callback == null");
 
       delegate.enqueue(new Callback<T>() {
         @Override public void onResponse(Call<T> call, final Response<T> response) {
+          // 返回成功或失败
           callbackExecutor.execute(new Runnable() {
             @Override public void run() {
               if (delegate.isCanceled()) {
@@ -74,6 +82,7 @@ final class ExecutorCallAdapterFactory extends CallAdapter.Factory {
         }
 
         @Override public void onFailure(Call<T> call, final Throwable t) {
+          // 返回失败
           callbackExecutor.execute(new Runnable() {
             @Override public void run() {
               callback.onFailure(ExecutorCallbackCall.this, t);
